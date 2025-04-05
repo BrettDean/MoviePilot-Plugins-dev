@@ -40,7 +40,7 @@ class autoSubscribe(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autosubscribe.png"
     # 插件版本
-    plugin_version = "1.0.6"
+    plugin_version = "1.0.7"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -273,7 +273,8 @@ class autoSubscribe(_PluginBase):
 
                     return len(tv_items)
 
-                while len(tv_set) < self._tv_limit:
+                scroll_count = 0
+                while len(tv_set) < self._tv_limit and scroll_count < 30:
                     logger.info(f"累计抓取到 {len(tv_set)} 条数据")
                     current_count = process_items()
 
@@ -281,6 +282,7 @@ class autoSubscribe(_PluginBase):
                         break
 
                     self.scroll_down(page, "div.grid__item")
+                    scroll_count += 1
 
                     new_count = process_items()
                     if new_count == current_count:
@@ -400,7 +402,8 @@ class autoSubscribe(_PluginBase):
 
                     return len(tv_items)
 
-                while len(tv_set) < self._tv_limit:
+                scroll_count = 0
+                while len(tv_set) < self._tv_limit and scroll_count < 30:
                     logger.info(f"累计抓取到 {len(tv_set)} 条数据")
                     current_count = process_items()
 
@@ -408,6 +411,7 @@ class autoSubscribe(_PluginBase):
                         break
 
                     self.scroll_down(page, "div.categorypack_yk_pack_v")
+                    scroll_count += 1
 
                     new_count = process_items()
                     if new_count == current_count:
@@ -555,7 +559,8 @@ class autoSubscribe(_PluginBase):
 
                     return len(tv_items)
 
-                while len(tv_set) < self._tv_limit:
+                scroll_count = 0
+                while len(tv_set) < self._tv_limit and scroll_count < 30:
                     logger.info(f"累计抓取到 {len(tv_set)} 条数据")
                     current_count = process_items()
 
@@ -563,6 +568,7 @@ class autoSubscribe(_PluginBase):
                         break
 
                     self.scroll_down(page, "div.tiles-item_container__OaNPB")
+                    scroll_count += 1
 
                     new_count = process_items()
                     if new_count == current_count:
