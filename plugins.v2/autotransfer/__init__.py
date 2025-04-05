@@ -410,7 +410,7 @@ class autoTransfer(_PluginBase):
                 new_dst = f"{filename}_{timestamp}{ext}"
             shutil.move(src, new_dst)
             logger.info(f"成功移动转移失败的文件 '{src}' 到 '{new_dst}'")
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             logger.error(
                 f"将转移失败的文件 '{src}' 移动到 '{new_dst}' 失败, traceback={traceback.format_exc()}"
             )
@@ -685,13 +685,13 @@ class autoTransfer(_PluginBase):
                 if not mediainfo:
                     logger.warn(f"未识别到媒体信息，标题: {file_meta.name}")
                     # 新增转移成功历史记录
-                    his = self.transferhis.add_fail(
+                    his = self.transferhis.add_fail(  # noqa: F841
                         fileitem=file_item, mode=transfer_type, meta=file_meta
                     )
                     if self._notify:
                         self.post_message(
                             mtype=NotificationType.Manual,
-                            title=f"{file_path.name} 未识别到媒体信息，无法入库！\n"
+                            title=f"{file_path.name} 未识别到媒体信息，无法入库！\n",
                         )
                     # 转移失败文件到指定目录
                     if (
@@ -699,9 +699,7 @@ class autoTransfer(_PluginBase):
                         and self._transfer_type == "move"
                         and self._move_failed_files
                     ):
-                        self.moveFailedFilesToPath(
-                            "未识别到媒体信息", file_item.path
-                        )
+                        self.moveFailedFilesToPath("未识别到媒体信息", file_item.path)
                     return
 
                 # 如果未开启新增已入库媒体是否跟随TMDB信息变化则根据tmdbid查询之前的title
