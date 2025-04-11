@@ -90,7 +90,7 @@ class autoTransfer(_PluginBase):
     _transfer_type = "move"
     _monitor_dirs = ""
     _exclude_keywords = ""
-    _interval: int = 10
+    _interval: int = 300
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
@@ -129,7 +129,7 @@ class autoTransfer(_PluginBase):
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
-            self._interval = config.get("interval") or 10
+            self._interval = config.get("interval") or 300
             self._cron = config.get("cron") or "*/10 * * * *"
             self._size = config.get("size") or 0
             self._softlink = config.get("softlink")
@@ -1295,7 +1295,7 @@ class autoTransfer(_PluginBase):
             transferinfo = media_files[0].get("transferinfo")
             file_meta = media_files[0].get("file_meta")
             mediainfo = media_files[0].get("mediainfo")
-            # 判断剧集最后更新时间距现在是已超过10秒或者电影，发送消息
+            # 判断剧集或者电影最后更新时间距现在是已超过300秒，发送消息
             if (datetime.datetime.now() - last_update_time).total_seconds() > int(
                 self._interval
             ) or mediainfo.type == MediaType.MOVIE:
@@ -1635,7 +1635,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "model": "interval",
                                             "label": "入库消息延迟",
-                                            "placeholder": "10",
+                                            "placeholder": "300",
                                         },
                                     }
                                 ],
@@ -1882,7 +1882,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "type": "info",
                                             "variant": "tonal",
-                                            "text": "1.入库消息延迟默认10s，如网络较慢可酌情调大，有助于发送统一入库消息。\n2.源目录与目的目录设置一致，则默认使用目录设置配置。否则可在源目录后拼接@覆盖方式（默认never覆盖方式）。\n3.开启软连接/Strm会在监控转移后联动【实时软连接】/【云盘Strm[助手]】插件生成软连接/Strm（只处理媒体文件，不处理刮削文件）。\n4.启用此插件后，可将`设定`--`存储&目录`--`目录`--`自动整理`改为`不整理`或`手动整理`\n5.`转移时下载器限速`只在移动模式生效，他会在每次移动前，限制下载器速度，转移完成后再恢复限速前的速度\n\n此插件由thsrite的目录监控插件修改而得\n本意是为了做类似v1的定时整理，因我只用本地移动，原地整理，故也不知软/硬链、Strm之类的是否可用",
+                                            "text": "1.入库消息延迟默认300s，如网络较慢可酌情调大，有助于发送统一入库消息。\n2.源目录与目的目录设置一致，则默认使用目录设置配置。否则可在源目录后拼接@覆盖方式（默认never覆盖方式）。\n3.开启软连接/Strm会在监控转移后联动【实时软连接】/【云盘Strm[助手]】插件生成软连接/Strm（只处理媒体文件，不处理刮削文件）。\n4.启用此插件后，可将`设定`--`存储&目录`--`目录`--`自动整理`改为`不整理`或`手动整理`\n5.`转移时下载器限速`只在移动模式生效，他会在每次移动前，限制下载器速度，转移完成后再恢复限速前的速度\n\n此插件由thsrite的目录监控插件修改而得\n本意是为了做类似v1的定时整理，因我只用本地移动，原地整理，故也不知软/硬链、Strm之类的是否可用",
                                             "style": {
                                                 "white-space": "pre-line",
                                                 "word-wrap": "break-word",
@@ -1939,7 +1939,7 @@ class autoTransfer(_PluginBase):
             "transfer_type": "move",
             "monitor_dirs": "",
             "exclude_keywords": "",
-            "interval": 10,
+            "interval": 300,
             "cron": "*/10 * * * *",
             "size": 0,
             "del_empty_dir": False,
