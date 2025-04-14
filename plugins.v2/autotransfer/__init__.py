@@ -48,7 +48,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.36"
+    plugin_version = "1.0.37"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -449,7 +449,9 @@ class autoTransfer(_PluginBase):
                     recursive=True,
                 )
                 # 去除 .parts 文件
-                list_files = [f for f in list_files if not str(f).endswith(".parts")]
+                list_files = [
+                    f for f in list_files if not str(f).lower().endswith(".parts")
+                ]
                 logger.info(f"源目录 {mon_path} 共发现 {len(list_files)} 个视频")
                 unique_items = {}
 
@@ -590,7 +592,9 @@ class autoTransfer(_PluginBase):
                             return
 
                 # 不是媒体文件不处理
-                if file_path.suffix not in settings.RMT_MEDIAEXT:
+                if file_path.suffix.lower() not in [
+                    ext.lower() for ext in settings.RMT_MEDIAEXT
+                ]:
                     logger.debug(f"{event_path} 不是媒体文件")
                     return
 
