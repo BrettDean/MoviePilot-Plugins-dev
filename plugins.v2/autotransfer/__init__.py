@@ -48,7 +48,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.37"
+    plugin_version = "1.0.38"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -943,7 +943,7 @@ class autoTransfer(_PluginBase):
                     )
 
                 if self._softlink:
-                    # 通知实时软连接生成
+                    # 通知实时软链接生成
                     self.eventmanager.send_event(
                         EventType.PluginAction,
                         {
@@ -1409,6 +1409,8 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "enabled",
                                                     "label": "启用插件",
+                                                    "hint": "开启后将按照执行周期定期运行",
+                                                    "persistent-hint": True,
                                                 },
                                             }
                                         ],
@@ -1422,6 +1424,8 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "notify",
                                                     "label": "发送通知",
+                                                    "hint": "整理完成后发送通知",
+                                                    "persistent-hint": True,
                                                 },
                                             }
                                         ],
@@ -1435,6 +1439,8 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "refresh",
                                                     "label": "刷新媒体库",
+                                                    "hint": "每个文件整理完成后通知媒体库扫描",
+                                                    "persistent-hint": True,
                                                 },
                                             }
                                         ],
@@ -1456,6 +1462,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "history",
                                                             "label": "存储历史记录",
+                                                            "hint": "开启后会将整理记录储存到'媒体整理'",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1469,6 +1477,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "scrape",
                                                             "label": "是否刮削",
+                                                            "hint": "所有监控目录整理完成以后，是否统一刮削图片和nfo文件",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1482,6 +1492,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "category",
                                                             "label": "是否二级分类",
+                                                            "hint": "开与关的区别就是'媒体库'-'电视剧'-'国产剧'-'还珠格格'和'媒体库'-'电视剧'-'还珠格格'",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1505,6 +1517,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "del_empty_dir",
                                                             "label": "删除空目录",
+                                                            "hint": "移动完成后删除空目录，推荐关闭，此开关仅在转移方式为移动时有效",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1517,7 +1531,7 @@ class autoTransfer(_PluginBase):
                                                         "component": "VSwitch",
                                                         "props": {
                                                             "model": "softlink",
-                                                            "label": "软连接",
+                                                            "label": "软链接",
                                                         },
                                                     }
                                                 ],
@@ -1544,6 +1558,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "onlyonce",
                                                             "label": "立即运行一次",
+                                                            "hint": "不论插件是否启动都立即运行一次",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1582,6 +1598,8 @@ class autoTransfer(_PluginBase):
                                             "model": "cron",
                                             "label": "执行周期",
                                             "placeholder": "*/10 * * * *",
+                                            "hint": "使用cron表达式定期执行，推荐 */10 * * * *",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1594,8 +1612,10 @@ class autoTransfer(_PluginBase):
                                         "component": "VTextField",
                                         "props": {
                                             "model": "size",
-                                            "label": "最低整理大小, 默认0, 单位MiB",
+                                            "label": "最低整理大小(MiB)",
                                             "placeholder": "0",
+                                            "hint": "默认0, 单位MiB, 只能输入数字",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1638,8 +1658,10 @@ class autoTransfer(_PluginBase):
                                         "component": "VTextField",
                                         "props": {
                                             "model": "interval",
-                                            "label": "入库消息延迟",
+                                            "label": "入库消息延迟(秒)",
                                             "placeholder": "300",
+                                            "hint": "默认0, 单位秒, 只能输入数字",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1678,7 +1700,7 @@ class autoTransfer(_PluginBase):
                                             "label": "选择转移时要限速的下载器",
                                             "items": [
                                                 {
-                                                    "title": "不限速(勾选此项或留空默认不限速)",
+                                                    "title": "不限速",
                                                     "value": "不限速-autoTransfer",
                                                 },
                                                 *[
@@ -1690,6 +1712,8 @@ class autoTransfer(_PluginBase):
                                                     if config.type == "qbittorrent"
                                                 ],
                                             ],
+                                            "hint": "选择'不限速'或留空都不限速。限速只会限制qb的下载速度",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1704,6 +1728,8 @@ class autoTransfer(_PluginBase):
                                             "model": "downloaderSpeedLimit",
                                             "label": "转移时下载器限速(KiB/s)",
                                             "placeholder": "0或留空不限速",
+                                            "hint": "默认0, 单位KiB/s, 只能输入数字",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1717,7 +1743,8 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "model": "pre_cancel_speed_limit",
                                             "label": "每次运行前取消qb限速",
-                                            "hint": "每次运行插件前强制取消下载器限速（防止意外断电后限速未恢复）",
+                                            "hint": "每次运行插件前强制取消下载器限速，防止插件或容器意外停止后限速未恢复",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1754,13 +1781,15 @@ class autoTransfer(_PluginBase):
                                                 "component": "VTextarea",
                                                 "props": {
                                                     "model": "monitor_dirs",
-                                                    "label": "监控目录(下载目录/源目录)",
-                                                    "rows": 6,
+                                                    "label": "监控目录",
+                                                    "rows": 7,
                                                     "auto-grow": "{{ monitor_dirs.length > 0 }}",
                                                     "placeholder": "每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move：\n"
                                                     "监控目录:转移目的目录\n"
                                                     "监控目录:转移目的目录#转移方式\n"
-                                                    "例如:\n/Downloads/电影/:/Library/电影/\n/Downloads/电视剧/:/Library/电视剧/",
+                                                    "例如:\n/Downloads/电影/:/Library/电影/\n/Downloads/电视剧/:/Library/电视剧/\n/mnt/手动备份/电影/:/Library/手动备份/电影/#copy",
+                                                    "hint": "如果监控目录是'设定'-'储存&目录'中的'资源目录'或其子目录，则插件设置的目的目录无效，会自动使用'设定'中的'媒体库目录'",
+                                                    "persistent-hint": True,
                                                 },
                                             }
                                         ],
@@ -1782,10 +1811,12 @@ class autoTransfer(_PluginBase):
                                         "component": "VTextarea",
                                         "props": {
                                             "model": "exclude_keywords",
-                                            "label": "排除关键词(正则, 区分大小写)",
+                                            "label": "排除关键词",
                                             "rows": 1,
                                             "auto-grow": "{{ monitor_dirs.length > 0 }}",
-                                            "placeholder": "每一行一个关键词",
+                                            "placeholder": "正则, 区分大小写, 一行一个正则表达式",
+                                            "hint": "正则, 区分大小写, 一行一个正则表达式",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1826,7 +1857,8 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "move_failed_files",
                                                             "label": "移动失败文件",
-                                                            "hint": "当转移失败时移动文件",
+                                                            "hint": "当转移失败时移动文件，如'未识别到媒体信息'、'媒体库存在同名文件'、'未识别到文件集数'",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1841,6 +1873,7 @@ class autoTransfer(_PluginBase):
                                                             "model": "move_excluded_files",
                                                             "label": "移动匹配 屏蔽词/关键字 的文件",
                                                             "hint": "当命中过滤规则时移动文件",
+                                                            "persistent-hint": True,
                                                         },
                                                     }
                                                 ],
@@ -1864,10 +1897,12 @@ class autoTransfer(_PluginBase):
                                         "component": "VTextarea",
                                         "props": {
                                             "model": "pathAfterMoveFailure",
-                                            "label": "移动方式下，当整理失败或命中关键词后，将文件移动到此路径(会根据失败原因和原目录结构将文件移动到此处)",
+                                            "label": "移动到的路径",
                                             "rows": 1,
                                             "auto-grow": "{{ monitor_dirs.length > 0 }}",
-                                            "placeholder": "只能有一个路径，留空或'转移方式'不是'移动'或关闭上面两个开关均不生效",
+                                            "placeholder": "如 /mnt/failed",
+                                            "hint": "移动方式，当整理失败或命中关键词后，将文件移动到此路径(会根据失败原因和原目录结构将文件移动到此处)，只能有一个路径，留空或'转移方式'不是'移动'或不满足上面两个开关的条件均不会移动。",
+                                            "persistent-hint": True,
                                         },
                                     }
                                 ],
@@ -1886,7 +1921,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "type": "info",
                                             "variant": "tonal",
-                                            "text": "1.入库消息延迟默认300s，如网络较慢可酌情调大，有助于发送统一入库消息。\n2.源目录与目的目录设置一致，则默认使用目录设置配置。否则可在源目录后拼接@覆盖方式（默认never覆盖方式）。\n3.开启软连接/Strm会在监控转移后联动【实时软连接】/【云盘Strm[助手]】插件生成软连接/Strm（只处理媒体文件，不处理刮削文件）。\n4.启用此插件后，可将`设定`--`存储&目录`--`目录`--`自动整理`改为`不整理`或`手动整理`\n5.`转移时下载器限速`只在移动模式生效，他会在每次移动前，限制下载器速度，转移完成后再恢复限速前的速度\n\n此插件由thsrite的目录监控插件修改而得\n本意是为了做类似v1的定时整理，因我只用本地移动，原地整理，故也不知软/硬链、Strm之类的是否可用",
+                                            "text": "1.入库消息延迟默认300s，如网络较慢可酌情调大，有助于发送统一入库消息。\n2.源目录与目的目录设置一致，则默认使用目录设置配置。否则可在源目录后拼接@覆盖方式（默认never覆盖方式）。\n3.开启软链接/Strm会在监控转移后联动【实时软链接】/【云盘Strm[助手]】插件生成软链接/Strm（只处理媒体文件，不处理刮削文件）。\n4.启用此插件后，可将'设定'-'存储&目录'-'目录'-'自动整理'改为'不整理'或'手动整理'\n5.'转移时下载器限速'只在移动(或复制)时生效，他会在每次移动(或复制)前，限制qb下载速度，转移完成后再恢复限速前的速度\n6.'是否二级分类'与'设定'-'储存&目录'-'媒体库目录'-'按类别分类'开关冲突时，以'设定'中的为准\n7.前3排开关，前2排推荐全部打开，第3排推荐全部关闭\n\n此插件由thsrite的目录监控插件修改而得\n本意是为了做类似v1的定时整理，因我只用本地移动，原地整理，故也不知软/硬链、Strm之类的是否可用",
                                             "style": {
                                                 "white-space": "pre-line",
                                                 "word-wrap": "break-word",
