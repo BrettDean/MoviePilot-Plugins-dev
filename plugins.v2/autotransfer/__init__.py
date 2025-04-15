@@ -1577,7 +1577,7 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "category",
                                                             "label": "是否二级分类",
-                                                            "hint": "开与关的区别就是'媒体库'-'电视剧'-'国产剧'-'还珠格格'和'媒体库'-'电视剧'-'还珠格格'",
+                                                            "hint": "开与关的区别就是'媒体库'-'电视剧'-'国产剧'-'甄嬛传'和'媒体库'-'电视剧'-'甄嬛传'",
                                                             "persistent-hint": True,
                                                         },
                                                     }
