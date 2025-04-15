@@ -1032,7 +1032,7 @@ class autoSubscribe(_PluginBase):
                                         "props": {
                                             "model": "enabled",
                                             "label": "启用插件",
-                                            "hint": "开启后将在每天凌晨0-6点随机时间运行一次，",
+                                            "hint": "开启后将在每天凌晨0-6点随机时间运行一次",
                                             "persistent-hint": True,
                                         },
                                     }
