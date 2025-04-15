@@ -3,11 +3,12 @@
     "name": "autoTransfer",
     "description": "类似v1的目录监控，可定期整理文件",
     "labels": "autoTransfer",
-    "version": "1.0.38",
+    "version": "1.0.39",
     "icon": "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png",
     "author": "Dean",
     "level": 1,
     "history": {
+      "v1.0.39": "feat: 增加插件运行状态显示",
       "v1.0.38": "enhance: 补充ui说明并强制持久化显示",
       "v1.0.37": "fix: 确保在处理文件时忽略大小写",
       "v1.0.36": "enhance: 获取文件列表时去除.parts文件",

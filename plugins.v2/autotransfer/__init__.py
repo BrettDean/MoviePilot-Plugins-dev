@@ -48,7 +48,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.38"
+    plugin_version = "1.0.39"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -425,11 +425,32 @@ class autoTransfer(_PluginBase):
             else:
                 logger.error("取消下载器限速失败")
 
+    def __update_plugin_state(self, value: str):
+        """
+        更新插件状态
+        """
+        # 记录运行状态
+        self.save_data(key="plugin_state", value=value)
+
+        # 记录当前时间
+        self.save_data(
+            key="plugin_state_time",
+            value=str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
+
     def main(self):
         """
         立即运行一次
         """
         try:
+            if self.get_data(key="plugin_state") == "running":
+                logger.info(
+                    f"插件{self.plugin_name} v{self.plugin_version} 上次运行未完成，跳过本次运行"
+                )
+                return
+            else:
+                self.__update_plugin_state("running")
+
             logger.info(f"插件{self.plugin_name} v{self.plugin_version} 开始运行")
             # 执行前先取消下载器限速
             if self._pre_cancel_speed_limit:
@@ -488,10 +509,13 @@ class autoTransfer(_PluginBase):
                         )
 
             logger.info("目录内所有文件整理完成！")
+            self.__update_plugin_state("finished")
+
         except Exception as e:
             logger.error(
                 f"插件{self.plugin_name} V{self.plugin_version} 运行失败，错误信息:{e}，traceback={traceback.format_exc()}"
             )
+            self.__update_plugin_state("failed")
 
     def __update_file_meta(
         self, file_path: str, file_meta: Dict, get_by_path_result
@@ -1389,7 +1413,47 @@ class autoTransfer(_PluginBase):
             ]
         return []
 
+    def __get_alert_props(self) -> Tuple[str, str, str]:
+        """
+        根据插件的状态获取对应的标签文本、颜色和样式。
+
+        Args:
+            plugin_state (str): 插件的运行状态，可能的值包括 "running", "finished", "failed"。
+
+        Returns:
+            Tuple[str, str, str]: 返回状态标签、颜色和样式。
+        """
+        plugin_state = self.get_data(key="plugin_state")
+        plugin_state_time = self.get_data(key="plugin_state_time")
+        # 定义默认的状态、颜色和样式
+        status_label = ""
+        alert_type = "info"  # 默认颜色
+        alert_variant = "tonal"  # 默认样式
+
+        if plugin_state == "running":
+            status_label = f"插件目前正在运行，开始运行时间为 {plugin_state_time}"
+            alert_type = "primary"  # 运行中状态，显示为紫色
+            alert_variant = "filled"  # 填充样式
+        elif plugin_state == "finished":
+            status_label = f"插件上次运行成功于 {plugin_state_time}，当前没有在运行"
+            alert_type = "success"  # 成功状态，显示为绿色
+            alert_variant = "filled"
+        elif plugin_state == "failed":
+            status_label = f"上次运行失败于 {plugin_state_time}，当前没有在运行"
+            alert_type = "error"  # 失败状态，显示为红色
+            alert_variant = "filled"
+        else:
+            status_label = "插件运行状态未知"
+            alert_type = "warning"  # 黄色
+            alert_variant = "filled"
+
+        return status_label, alert_type, alert_variant
+
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
+
+        # 获取插件运行状态对应的标签、颜色和样式
+        status_label, alert_type, alert_variant = self.__get_alert_props()
+
         return [
             {
                 "component": "VForm",
@@ -1397,6 +1461,27 @@ class autoTransfer(_PluginBase):
                     {
                         "component": "VForm",
                         "content": [
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12},
+                                "content": [
+                                    {
+                                        "component": "VAlert",
+                                        "props": {
+                                            "type": alert_type,
+                                            "variant": alert_variant,
+                                            "text": status_label,
+                                            "style": {
+                                                "white-space": "pre-line",
+                                                "word-wrap": "break-word",
+                                                "height": "auto",
+                                                "max-height": "300px",
+                                                "overflow-y": "auto",
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
                             {
                                 "component": "VRow",
                                 "content": [
@@ -1788,7 +1873,7 @@ class autoTransfer(_PluginBase):
                                                     "监控目录:转移目的目录\n"
                                                     "监控目录:转移目的目录#转移方式\n"
                                                     "例如:\n/Downloads/电影/:/Library/电影/\n/Downloads/电视剧/:/Library/电视剧/\n/mnt/手动备份/电影/:/Library/手动备份/电影/#copy",
-                                                    "hint": "如果监控目录是'设定'-'储存&目录'中的'资源目录'或其子目录，则插件设置的目的目录无效，会自动使用'设定'中的'媒体库目录'",
+                                                    "hint": "如果'监控目录'中的视频在'设定'-'储存&目录'中的'资源目录'或其子目录中，则插件设置的目的目录无效，会自动使用'设定'中的'媒体库目录'",
                                                     "persistent-hint": True,
                                                 },
                                             }
