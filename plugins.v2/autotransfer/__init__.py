@@ -48,7 +48,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.39"
+    plugin_version = "1.0.40"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -84,8 +84,7 @@ class autoTransfer(_PluginBase):
     _cron = None
     filetransfer = None
     _size = 0
-    # 取消限速开关
-    _pre_cancel_speed_limit = False
+    _downloaders_limit_enabled = False
     # 转移方式
     _transfer_type = "move"
     _monitor_dirs = ""
@@ -137,10 +136,12 @@ class autoTransfer(_PluginBase):
             self._del_empty_dir = config.get("del_empty_dir") or False
             self._pathAfterMoveFailure = config.get("pathAfterMoveFailure") or None
             self._downloaderSpeedLimit = config.get("downloaderSpeedLimit") or 0
-            self._downloaders = config.get("downloaders") or ["不限速-autoTransfer"]
+            self._downloaders = config.get("downloaders")
             self._move_failed_files = config.get("move_failed_files", True)
             self._move_excluded_files = config.get("move_excluded_files", True)
-            self._pre_cancel_speed_limit = config.get("pre_cancel_speed_limit", False)
+            self._downloaders_limit_enabled = config.get(
+                "downloaders_limit_enabled", False
+            )
 
         # 停止现有任务
         self.stop_service()
@@ -259,7 +260,7 @@ class autoTransfer(_PluginBase):
                 "downloaders": self._downloaders,
                 "move_failed_files": self._move_failed_files,
                 "move_excluded_files": self._move_excluded_files,
-                "pre_cancel_speed_limit": self._pre_cancel_speed_limit,
+                "downloaders_limit_enabled": self._downloaders_limit_enabled,
             }
         )
 
@@ -363,37 +364,47 @@ class autoTransfer(_PluginBase):
         :param fail_reason: 失败的原因
         :param src: 需要转移的文件路径
         """
-        is_download_speed_limited = False
-        try:
-            # 先获取当前下载器的限速
-            download_limit_current_val, _ = self.get_downloader_limit_current_val()
-            if (
-                float(download_limit_current_val) > float(self._downloaderSpeedLimit)
-                or float(download_limit_current_val) == 0
-            ):
-                is_download_speed_limited = self.set_download_limit(
-                    self._downloaderSpeedLimit
+        if self._downloaders_limit_enabled:
+            try:
+                # 先获取当前下载器的限速
+                download_limit_current_val, _ = self.get_downloader_limit_current_val()
+                # 记录当前速度限制
+                self.save_data(
+                    key="download_limit_current_val", value=download_limit_current_val
                 )
-                if is_download_speed_limited:
-                    logger.info(
-                        f"下载器限速成功设置为 {self._downloaderSpeedLimit} KiB/s"
+                if (
+                    float(download_limit_current_val)
+                    > float(self._downloaderSpeedLimit)
+                    or float(download_limit_current_val) == 0
+                ):
+                    is_download_speed_limited = self.set_download_limit(
+                        self._downloaderSpeedLimit
                     )
+                    if is_download_speed_limited:
+                        logger.info(
+                            f"下载器限速成功设置为 {self._downloaderSpeedLimit} KiB/s"
+                        )
+                        # 记录已限速
+                        self.save_data(
+                            key="is_download_speed_limited",
+                            value=is_download_speed_limited,
+                        )
+                    else:
+                        logger.info(
+                            f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
+                        )
                 else:
                     logger.info(
-                        f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
+                        f"不用设置下载器限速，当前下载器限速为 {download_limit_current_val} KiB/s 大于或等于设定值 {self._downloaderSpeedLimit} KiB/s"
                     )
-            else:
-                logger.info(
-                    f"不用设置下载器限速，当前下载器限速为 {download_limit_current_val} KiB/s 大于或等于设定值 {self._downloaderSpeedLimit} KiB/s"
+            except Exception as e:
+                logger.error(
+                    f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
                 )
-        except Exception as e:
-            logger.error(
-                f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
-            )
-            logger.debug(
-                f"下载器限速失败: {str(e)}, traceback={traceback.format_exc()}"
-            )
-            is_download_speed_limited = False
+                logger.debug(
+                    f"下载器限速失败: {str(e)}, traceback={traceback.format_exc()}"
+                )
+                self.save_data(key="is_download_speed_limited", value=False)
 
         try:
             logger.info(f"开始转移失败的文件 '{src}'")
@@ -416,27 +427,40 @@ class autoTransfer(_PluginBase):
             )
 
         # 恢复原速
-        if is_download_speed_limited:
+        if self._downloaders_limit_enabled and self.get_data(
+            key="is_download_speed_limited"
+        ):
             recover_download_limit_success = self.set_download_limit(
-                download_limit_current_val
+                download_limit=self.get_data(key="download_limit_current_val")
+                or download_limit_current_val
             )
             if recover_download_limit_success:
                 logger.info("取消下载器限速成功")
+                # 更新数据库中的限速状态为False
+                self.save_data(
+                    key="is_download_speed_limited",
+                    value=recover_download_limit_success,
+                )
             else:
                 logger.error("取消下载器限速失败")
 
     def __update_plugin_state(self, value: str):
         """
-        更新插件状态
+        更新插件状态, 可能的值有:
+        running: 运行中
+        finished: 运行完成
+        failed: 运行失败
+        toolong: 运行超过30分钟
         """
         # 记录运行状态
         self.save_data(key="plugin_state", value=value)
 
         # 记录当前时间
-        self.save_data(
-            key="plugin_state_time",
-            value=str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-        )
+        if value != "toolong":
+            self.save_data(
+                key="plugin_state_time",
+                value=str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            )
 
     def main(self):
         """
@@ -444,21 +468,25 @@ class autoTransfer(_PluginBase):
         """
         try:
             if self.get_data(key="plugin_state") == "running":
-                logger.info(
-                    f"插件{self.plugin_name} v{self.plugin_version} 上次运行未完成，跳过本次运行"
-                )
-                return
+                last_state_time = self.get_data(key="plugin_state_time")
+                # 如果上次运行在30分钟以内
+                if (
+                    last_state_time
+                    and datetime.datetime.now()
+                    - datetime.datetime.strptime(last_state_time, "%Y-%m-%d %H:%M:%S")
+                    < datetime.timedelta(minutes=30)
+                ):
+                    logger.info(
+                        f"插件{self.plugin_name} v{self.plugin_version} 上次运行未完成，跳过本次运行"
+                    )
+                    return
+                else:  # 上次运行超过30分钟还没完成, 又来了新的任务，就慢慢排队等
+                    pass
+                    self.__update_plugin_state("toolong")
             else:
                 self.__update_plugin_state("running")
 
             logger.info(f"插件{self.plugin_name} v{self.plugin_version} 开始运行")
-            # 执行前先取消下载器限速
-            if self._pre_cancel_speed_limit:
-                logger.info("【预取消限速】正在取消下载器限速...")
-                if self.set_download_limit(0):
-                    logger.info("下载器限速已取消")
-                else:
-                    logger.error("下载器限速取消失败")
 
             # 遍历所有目录
             for idx, mon_path in enumerate(self._dirconf.keys(), start=1):
@@ -473,7 +501,7 @@ class autoTransfer(_PluginBase):
                 list_files = [
                     f for f in list_files if not str(f).lower().endswith(".parts")
                 ]
-                logger.info(f"源目录 {mon_path} 共发现 {len(list_files)} 个视频")
+                logger.info(f"源目录 {mon_path} 共发现 {len(list_files)} 个视频待整理")
                 unique_items = {}
 
                 # 遍历目录下所有文件
@@ -487,9 +515,7 @@ class autoTransfer(_PluginBase):
                     )
                     # 如果返回值是 None，则跳过
                     if transfer_result is None:
-                        logger.debug(
-                            f"处理文件 {file_path} 时，__handle_file 返回了 None，只要不是整理成功都是返回None，跳过刮削"
-                        )
+                        logger.debug(f"文件 {file_path} 不用刮削")
                         continue
 
                     transferinfo, mediainfo, file_meta = transfer_result
@@ -785,62 +811,77 @@ class autoTransfer(_PluginBase):
                     return
 
                 # 下载器限速
-                is_download_speed_limited = False
-                if (
-                    target_dir.transfer_type
-                    in [
-                        "move",
-                        "copy",
-                        "rclone_copy",
-                        "rclone_move",
-                    ]
-                    and "不限速-autoTransfer" not in self._downloaders
-                    and self._downloaderSpeedLimit != 0
-                ):
-                    logger.info(
-                        f"下载器限速 - {', '.join(self._downloaders)}，下载速度限制为 {self._downloaderSpeedLimit} KiB/s，因正在移动或复制文件{file_item.path}"
-                    )
-                    try:
-                        # 先获取当前下载器的限速
-                        download_limit_current_val, _ = (
-                            self.get_downloader_limit_current_val()
-                        )
-                        if (
-                            float(download_limit_current_val)
-                            > float(self._downloaderSpeedLimit)
-                            or float(download_limit_current_val) == 0
-                        ):
-                            is_download_speed_limited = self.set_download_limit(
-                                self._downloaderSpeedLimit
+                if self._downloaders_limit_enabled:
+                    if (
+                        target_dir.transfer_type
+                        in [
+                            "move",
+                            "copy",
+                            "rclone_copy",
+                            "rclone_move",
+                        ]
+                        and self._downloaders_limit_enabled
+                        and self._downloaderSpeedLimit != 0
+                    ):
+                        try:
+                            # 先获取当前下载器的限速
+                            download_limit_current_val, _ = (
+                                self.get_downloader_limit_current_val()
                             )
-                        else:
-                            logger.info(
-                                f"不用设置下载器限速，当前下载器限速为 {download_limit_current_val} KiB/s 大于或等于设定值 {self._downloaderSpeedLimit} KiB/s"
+                            # 记录当前速度限制
+                            self.save_data(
+                                key="download_limit_current_val",
+                                value=download_limit_current_val,
                             )
-                    except Exception as e:
-                        logger.error(
-                            f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
-                        )
-                        logger.debug(
-                            f"下载器限速失败: {str(e)}, traceback={traceback.format_exc()}"
-                        )
-                        is_download_speed_limited = False
 
-                    if not is_download_speed_limited:
-                        logger.debug(f"下载器{', '.join(self._downloaders)} 限速失败")
+                            if (
+                                float(download_limit_current_val)
+                                > float(self._downloaderSpeedLimit)
+                                or float(download_limit_current_val) == 0
+                            ):
+                                logger.info(
+                                    f"下载器限速 - {', '.join(self._downloaders)}，下载速度限制为 {self._downloaderSpeedLimit} KiB/s，因正在移动或复制文件{file_item.path}"
+                                )
+                                is_download_speed_limited = self.set_download_limit(
+                                    self._downloaderSpeedLimit
+                                )
+                                self.save_data(
+                                    key="is_download_speed_limited",
+                                    value=is_download_speed_limited,
+                                )
+                                if not is_download_speed_limited:
+                                    logger.error(
+                                        f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)}"
+                                    )
+                            else:
+                                logger.info(
+                                    f"不用设置下载器限速，当前下载器限速为 {download_limit_current_val} KiB/s 大于或等于设定值 {self._downloaderSpeedLimit} KiB/s"
+                                )
+                        except Exception as e:
+                            logger.error(
+                                f"下载器限速失败，请检查下载器 {', '.join(self._downloaders)} 的连通性，本次整理将跳过下载器限速"
+                            )
+                            logger.debug(
+                                f"下载器限速失败: {str(e)}, traceback={traceback.format_exc()}"
+                            )
+                            self.save_data(
+                                key="is_download_speed_limited",
+                                value=False,
+                            )
+                    else:
+                        if self._downloaderSpeedLimit == 0:
+                            log_msg = "下载速度限制为0或为空，默认关闭限速"
+                        elif target_dir.transfer_type not in [
+                            "move",
+                            "copy",
+                            "rclone_copy",
+                            "rclone_move",
+                        ]:
+                            log_msg = "转移方式不是移动或复制，下载器限速默认关闭"
+                        logger.info(log_msg)
                 else:
-                    if "不限速-autoTransfer" in self._downloaders:
-                        log_msg = "已勾选'不限速'或勾选需限速的下载器，默认关闭限速"
-                    elif self._downloaderSpeedLimit == 0:
-                        log_msg = "下载速度限制为0或为空，默认关闭限速"
-                    elif target_dir.transfer_type not in [
-                        "move",
-                        "copy",
-                        "rclone_copy",
-                        "rclone_move",
-                    ]:
-                        log_msg = "转移方式不是移动或复制，下载器限速默认关闭"
-                    logger.info(log_msg)
+                    if not self._downloaders_limit_enabled:
+                        logger.info("下载器限速未开启")
 
                 # 转移文件
                 transferinfo: TransferInfo = self.chain.transfer(
@@ -851,12 +892,17 @@ class autoTransfer(_PluginBase):
                     episodes_info=episodes_info,
                 )
                 # 恢复原速
-                if is_download_speed_limited:
+                if self._downloaders_limit_enabled and self.get_data(
+                    key="is_download_speed_limited"
+                ):
                     recover_download_limit_success = self.set_download_limit(
-                        download_limit_current_val
+                        download_limit=self.get_data(key="download_limit_current_val")
+                        or download_limit_current_val
                     )
                     if recover_download_limit_success:
                         logger.info("取消下载器限速成功")
+                        # 更新数据库中的限速状态为False
+                        self.save_data(key="is_download_speed_limited", value=False)
                     else:
                         logger.error("取消下载器限速失败")
 
@@ -1358,12 +1404,6 @@ class autoTransfer(_PluginBase):
                             f"{file_meta.season} {StringUtils.format_ep(episodes)}"
                         )
                     # 发送消息
-                    # self.transferchain.send_transfer_message(
-                    #     meta=file_meta,
-                    #     mediainfo=mediainfo,
-                    #     transferinfo=transferinfo,
-                    #     season_episode=season_episode,
-                    # )
                     try:
                         self.send_transfer_message(
                             meta=file_meta,
@@ -1435,15 +1475,21 @@ class autoTransfer(_PluginBase):
             alert_type = "primary"  # 运行中状态，显示为紫色
             alert_variant = "filled"  # 填充样式
         elif plugin_state == "finished":
-            status_label = f"插件上次运行成功于 {plugin_state_time}，当前没有在运行"
+            status_label = (
+                f"插件上次成功运行，运行完成于 {plugin_state_time}，当前没有在运行"
+            )
             alert_type = "success"  # 成功状态，显示为绿色
             alert_variant = "filled"
         elif plugin_state == "failed":
             status_label = f"上次运行失败于 {plugin_state_time}，当前没有在运行"
             alert_type = "error"  # 失败状态，显示为红色
             alert_variant = "filled"
+        elif plugin_state == "toolong":
+            status_label = "上次运行时间长于30分钟"
+            alert_type = "warning"  # 黄色
+            alert_variant = "filled"
         else:
-            status_label = "插件运行状态未知"
+            status_label = "插件运行状态未知(运行一次即可更新状态)"
             alert_type = "warning"  # 黄色
             alert_variant = "filled"
 
@@ -1562,7 +1608,7 @@ class autoTransfer(_PluginBase):
                                                         "props": {
                                                             "model": "scrape",
                                                             "label": "是否刮削",
-                                                            "hint": "所有监控目录整理完成以后，是否统一刮削图片和nfo文件",
+                                                            "hint": "每处理完一行监控目录，就刮削一次对应的图片和nfo文件",
                                                             "persistent-hint": True,
                                                         },
                                                     }
@@ -1776,6 +1822,21 @@ class autoTransfer(_PluginBase):
                                 "props": {"cols": 12, "md": 4},
                                 "content": [
                                     {
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "downloaders_limit_enabled",
+                                            "label": "开启下载器限速",
+                                            "hint": "开启后，在移动或复制文件时会限制qb下载速度，默认关闭",
+                                            "persistent-hint": True,
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
+                                    {
                                         "component": "VSelect",
                                         "props": {
                                             "multiple": True,
@@ -1784,10 +1845,6 @@ class autoTransfer(_PluginBase):
                                             "model": "downloaders",
                                             "label": "选择转移时要限速的下载器",
                                             "items": [
-                                                {
-                                                    "title": "不限速",
-                                                    "value": "不限速-autoTransfer",
-                                                },
                                                 *[
                                                     {
                                                         "title": config.name,
@@ -1797,7 +1854,7 @@ class autoTransfer(_PluginBase):
                                                     if config.type == "qbittorrent"
                                                 ],
                                             ],
-                                            "hint": "选择'不限速'或留空都不限速。限速只会限制qb的下载速度",
+                                            "hint": "列表中只会有qb",
                                             "persistent-hint": True,
                                         },
                                     }
@@ -1805,7 +1862,7 @@ class autoTransfer(_PluginBase):
                             },
                             {
                                 "component": "VCol",
-                                "props": {"cols": 12, "md": 3},
+                                "props": {"cols": 12, "md": 4},
                                 "content": [
                                     {
                                         "component": "VTextField",
@@ -1814,21 +1871,6 @@ class autoTransfer(_PluginBase):
                                             "label": "转移时下载器限速(KiB/s)",
                                             "placeholder": "0或留空不限速",
                                             "hint": "默认0, 单位KiB/s, 只能输入数字",
-                                            "persistent-hint": True,
-                                        },
-                                    }
-                                ],
-                            },
-                            {
-                                "component": "VCol",
-                                "props": {"cols": 12, "md": 5},
-                                "content": [
-                                    {
-                                        "component": "VSwitch",
-                                        "props": {
-                                            "model": "pre_cancel_speed_limit",
-                                            "label": "每次运行前取消qb限速",
-                                            "hint": "每次运行插件前强制取消下载器限速，防止插件或容器意外停止后限速未恢复",
                                             "persistent-hint": True,
                                         },
                                     }
@@ -2011,7 +2053,7 @@ class autoTransfer(_PluginBase):
                                                 "white-space": "pre-line",
                                                 "word-wrap": "break-word",
                                                 "height": "auto",
-                                                "max-height": "300px",
+                                                "max-height": "320px",
                                                 "overflow-y": "auto",
                                             },
                                         },
@@ -2072,7 +2114,7 @@ class autoTransfer(_PluginBase):
             "pathAfterMoveFailure": None,
             "move_failed_files": True,
             "move_excluded_files": True,
-            "pre_cancel_speed_limit": False,
+            "downloaders_limit_enabled": False,
         }
 
     def get_page(self) -> List[dict]:
@@ -2089,6 +2131,3 @@ class autoTransfer(_PluginBase):
                 self._scheduler.shutdown()
                 self._event.clear()
             self._scheduler = None
-
-
-# TODO: 考虑在表plugindata中储存限速状态，防止容器或插件意外退出后没有恢复原速度，有这个就可以删除开关`每次运行前取消qb限速`了
