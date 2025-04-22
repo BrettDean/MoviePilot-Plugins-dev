@@ -1607,7 +1607,7 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "refresh",
                                                     "label": "刷新媒体库",
-                                                    "hint": "每个文件整理完成后通知媒体库扫描",
+                                                    "hint": "每个文件整理完成后发送整理完成事件，配合插件'媒体库服务器刷新'一起使用可以通知媒体库扫描",
                                                     "persistent-hint": True,
                                                 },
                                             }
