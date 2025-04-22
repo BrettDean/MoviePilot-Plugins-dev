@@ -221,6 +221,7 @@ class autoTransfer(_PluginBase):
                 self.__runResetPlunindata()
                 self._reset_plunin_data = False
                 self.__update_config()
+                logger.info("重置插件运行数据成功")
                 
             # 运行一次定时服务
             if self._onlyonce:
@@ -571,7 +572,7 @@ class autoTransfer(_PluginBase):
                                 retry_count += 1
                                 continue  # 重试
 
-                # 广播整理完成事件，让'媒体库服务器刷新'插件通知媒体库刷新
+                # 广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新
                 if self._refresh:
                     for transferinfo, mediainfo, file_meta in unique_items.values():
                         try:
@@ -1617,7 +1618,7 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "refresh",
                                                     "label": "刷新媒体库",
-                                                    "hint": "广播整理完成事件，让'媒体库服务器刷新'插件通知媒体库刷新",
+                                                    "hint": "广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新",
                                                     "persistent-hint": True,
                                                 },
                                             }
