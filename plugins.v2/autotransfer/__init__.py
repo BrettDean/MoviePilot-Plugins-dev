@@ -49,7 +49,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.41"
+    plugin_version = "1.0.42"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -571,6 +571,26 @@ class autoTransfer(_PluginBase):
                                 retry_count += 1
                                 continue  # 重试
 
+                # 广播整理完成事件，让'媒体库服务器刷新'插件通知媒体库刷新
+                if self._refresh:
+                    for transferinfo, mediainfo, file_meta in unique_items.values():
+                        try:
+                            self.eventmanager.send_event(
+                                EventType.TransferComplete,
+                                {
+                                    "meta": file_meta,
+                                    "mediainfo": mediainfo,
+                                    "transferinfo": transferinfo,
+                                },
+                            )
+                            logger.info(
+                                f"成功通知媒体库刷新: {transferinfo.target_diritem.path}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"通知媒体库刷新失败: {transferinfo.target_diritem.path} ,错误信息: {e}"
+                            )
+
             logger.info("目录内所有文件整理完成！")
             self.__update_plugin_state("finished")
 
@@ -1038,16 +1058,6 @@ class autoTransfer(_PluginBase):
                         media_list
                     )
 
-                if self._refresh:
-                    # 广播事件
-                    self.eventmanager.send_event(
-                        EventType.TransferComplete,
-                        {
-                            "meta": file_meta,
-                            "mediainfo": mediainfo,
-                            "transferinfo": transferinfo,
-                        },
-                    )
 
                 if self._softlink:
                     # 通知实时软链接生成
@@ -1607,7 +1617,7 @@ class autoTransfer(_PluginBase):
                                                 "props": {
                                                     "model": "refresh",
                                                     "label": "刷新媒体库",
-                                                    "hint": "每个文件整理完成后发送整理完成事件，配合插件'媒体库服务器刷新'一起使用可以通知媒体库扫描",
+                                                    "hint": "广播整理完成事件，让'媒体库服务器刷新'插件通知媒体库刷新",
                                                     "persistent-hint": True,
                                                 },
                                             }
