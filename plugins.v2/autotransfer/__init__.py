@@ -636,15 +636,6 @@ class autoTransfer(_PluginBase):
                     for transferinfo, mediainfo, file_meta in unique_items.values():
                         try:
                             self._refresh_lib_modified(transferinfo, mediainfo)
-
-                            # self.eventmanager.send_event(
-                            #     EventType.TransferComplete,
-                            #     {
-                            #         "meta": file_meta,
-                            #         "mediainfo": mediainfo,
-                            #         "transferinfo": transferinfo,
-                            #     },
-                            # )
                             logger.info(
                                 f"成功通知媒体库刷新: {transferinfo.target_diritem.path}"
                             )
@@ -1847,7 +1838,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "type": "info",
                                             "variant": "text",
-                                            "text": "比如原版刷新媒体库的是入库了 '/Library/电视剧/欧美剧/黑镜 (2011)' 以后就让 plex 扫描 '/mnt/Library/电视剧/欧美剧/'，而修改版是让 plex 扫描 '/Library/电视剧/欧美剧/黑镜 (2011)/'，减少工作量。如果媒体服务器不是plex，不管选哪个都是走原来的逻辑",
+                                            "text": "两个开关二选一即可。比如原版刷新媒体库的是入库了 '/Library/电视剧/欧美剧/黑镜 (2011)' 以后就让 plex 扫描 '/mnt/Library/电视剧/欧美剧/'，而修改版是让 plex 扫描 '/Library/电视剧/欧美剧/黑镜 (2011)/'，减少工作量。如果媒体服务器不是plex，不管选哪个都是走原来的逻辑",
                                             "density": "compact",
                                             "style": "font-size: 13px; color: #666;",
                                         },
