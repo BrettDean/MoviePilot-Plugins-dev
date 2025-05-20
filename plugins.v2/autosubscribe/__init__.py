@@ -40,7 +40,7 @@ class autoSubscribe(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autosubscribe.png"
     # 插件版本
-    plugin_version = "1.0.8"
+    plugin_version = "1.0.9"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -497,6 +497,11 @@ class autoSubscribe(_PluginBase):
                         logger.debug("爱奇艺有可能作妖，随机等待5-20秒")
                         time.sleep(random.uniform(5, 20))
 
+                # 等待并点击“继续使用当前浏览器观看”按钮
+                time.sleep(2)
+                page.get_by_text("继续使用当前浏览器观看").click()
+
+                time.sleep(2)
                 # 等待并点击"全部剧集"按钮
                 if page.locator(
                     "div.halo_divContainer__czfwR span#text", has_text="全部剧集"
