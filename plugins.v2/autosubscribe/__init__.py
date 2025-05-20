@@ -767,15 +767,15 @@ class autoSubscribe(_PluginBase):
                                     if (
                                         last_air_date is not None
                                         and last_air_date
-                                        <= datetime.now().strftime("%Y-%m-%d")
+                                        < datetime.now().strftime("%Y-%m-%d")
                                     ):
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的air_date={last_air_date}, 小于等于当前日期, 开始更新订阅状态或添加新订阅"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的air_date={last_air_date}, 小于当前日期, 开始更新订阅状态或添加新订阅"
                                         )
                                         need_search_again = True
                                     else:
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的播出日期={last_air_date}, 大于当前日期或不存在, 跳过"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的播出日期={last_air_date}, 大于等于当前日期或不存在, 跳过"
                                         )
                                 else:  # 某季中缺少的集不为: 全部
                                     episode_list = ", ".join(
@@ -794,19 +794,19 @@ class autoSubscribe(_PluginBase):
                                         recognize_result.media_info.last_air_date
                                     )
 
-                                    # 如果last_air_date小于等于当前日期
+                                    # 如果last_air_date小于当前日期
                                     if (
                                         last_air_date is not None
                                         and last_air_date
-                                        <= datetime.now().strftime("%Y-%m-%d")
+                                        < datetime.now().strftime("%Y-%m-%d")
                                     ):
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}小于等于当前日期，开始更新订阅状态或添加新订阅"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}小于当前日期，开始更新订阅状态或添加新订阅"
                                         )
                                         need_search_again = True
                                     else:
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}大于当前日期或不存在，跳过"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}大于等于当前日期或不存在，跳过"
                                         )
 
                                 if need_search_again:
