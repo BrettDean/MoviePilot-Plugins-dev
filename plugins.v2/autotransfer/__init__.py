@@ -1468,7 +1468,7 @@ class autoTransfer(_PluginBase):
             return [
                 {
                     "id": "autoTransfer",
-                    "name": "类似v1的目录监控，可定期整理文件",
+                    "name": "autoTransfer定期整理文件",
                     "trigger": CronTrigger.from_crontab(self._cron),
                     "func": self.main,
                     "kwargs": {},
