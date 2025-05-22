@@ -1972,7 +1972,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "model": "downloaders_limit_enabled",
                                             "label": "开启下载器限速",
-                                            "hint": "开启后，在移动或复制文件时会限制qb下载速度，默认关闭",
+                                            "hint": "开启后，在移动或复制文件时会限制qb下载速度，完成后恢复原(限)速，默认关闭",
                                             "persistent-hint": True,
                                         },
                                     }
