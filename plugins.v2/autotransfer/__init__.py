@@ -51,7 +51,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.44"
+    plugin_version = "1.0.45"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -1357,16 +1357,19 @@ class autoTransfer(_PluginBase):
         if bool(transferinfo.message):
             msg_str = f"{msg_str}\n以下文件处理失败: \n{transferinfo.message}"
         # 发送
-        self.chainbase.post_message(
-            Notification(
-                mtype=NotificationType.Organize,
-                title=msg_title,
-                text=msg_str,
-                image=mediainfo.get_message_image(),
-                username=username,
-                link=mediainfo.detail_link,
+        try:
+            self.chainbase.post_message(
+                Notification(
+                    mtype=NotificationType.Organize,
+                    title=msg_title,
+                    text=msg_str,
+                    image=mediainfo.get_message_image(),
+                    username=username,
+                    link=mediainfo.detail_link,
+                )
             )
-        )
+        except Exception as e:
+            logger.error(f"发送消息失败: {str(e)}, traceback={traceback.format_exc()}")
 
     def send_msg(self):
         """
@@ -1438,9 +1441,10 @@ class autoTransfer(_PluginBase):
                         logger.error(
                             f"发送消息失败: {str(e)}, traceback={traceback.format_exc()}"
                         )
-                        del self._medias[medis_title_year_season]
-                # 发送完消息，移出key
-                del self._medias[medis_title_year_season]
+                    finally:
+                        # 无论发送成功与否，都移出已处理的媒体项
+                        if medis_title_year_season in self._medias:
+                            del self._medias[medis_title_year_season]
                 continue
 
     def get_state(self) -> bool:
