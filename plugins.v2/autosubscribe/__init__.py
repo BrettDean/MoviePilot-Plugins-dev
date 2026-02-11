@@ -40,7 +40,7 @@ class autoSubscribe(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autosubscribe.png"
     # 插件版本
-    plugin_version = "1.0.8"
+    plugin_version = "1.0.9"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -497,6 +497,11 @@ class autoSubscribe(_PluginBase):
                         logger.debug("爱奇艺有可能作妖，随机等待5-20秒")
                         time.sleep(random.uniform(5, 20))
 
+                # 等待并点击“继续使用当前浏览器观看”按钮
+                time.sleep(2)
+                page.get_by_text("继续使用当前浏览器观看").click()
+
+                time.sleep(2)
                 # 等待并点击"全部剧集"按钮
                 if page.locator(
                     "div.halo_divContainer__czfwR span#text", has_text="全部剧集"
@@ -762,15 +767,15 @@ class autoSubscribe(_PluginBase):
                                     if (
                                         last_air_date is not None
                                         and last_air_date
-                                        <= datetime.now().strftime("%Y-%m-%d")
+                                        < datetime.now().strftime("%Y-%m-%d")
                                     ):
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的air_date={last_air_date}, 小于等于当前日期, 开始更新订阅状态或添加新订阅"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的air_date={last_air_date}, 小于当前日期, 开始更新订阅状态或添加新订阅"
                                         )
                                         need_search_again = True
                                     else:
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的播出日期={last_air_date}, 大于当前日期或不存在, 跳过"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新集的播出日期={last_air_date}, 大于等于当前日期或不存在, 跳过"
                                         )
                                 else:  # 某季中缺少的集不为: 全部
                                     episode_list = ", ".join(
@@ -789,19 +794,19 @@ class autoSubscribe(_PluginBase):
                                         recognize_result.media_info.last_air_date
                                     )
 
-                                    # 如果last_air_date小于等于当前日期
+                                    # 如果last_air_date小于当前日期
                                     if (
                                         last_air_date is not None
                                         and last_air_date
-                                        <= datetime.now().strftime("%Y-%m-%d")
+                                        < datetime.now().strftime("%Y-%m-%d")
                                     ):
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}小于等于当前日期，开始更新订阅状态或添加新订阅"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}小于当前日期，开始更新订阅状态或添加新订阅"
                                         )
                                         need_search_again = True
                                     else:
                                         logger.debug(
-                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}大于当前日期或不存在，跳过"
+                                            f"电视剧:'{title} ({year}) tmdb_id={tmdb_id}'最新一集的播出日期={last_air_date}大于等于当前日期或不存在，跳过"
                                         )
 
                                 if need_search_again:

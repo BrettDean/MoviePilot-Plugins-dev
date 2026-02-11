@@ -13,10 +13,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.utils.system import SystemUtils
 from app.utils.string import StringUtils
 from app.schemas.types import EventType, MediaType, SystemConfigKey
-from app.schemas import Notification
 from app.plugins import _PluginBase
 from app.modules.filemanager import FileManagerModule
 from app.log import logger
+from app.helper.mediaserver import MediaServerHelper
 from app.helper.downloader import DownloaderHelper
 from app.helper.directory import DirectoryHelper
 from app.db.transferhistory_oper import TransferHistoryOper
@@ -31,9 +31,11 @@ from app.chain.tmdb import TmdbChain
 from app.chain.storage import StorageChain
 from app.chain.media import MediaChain
 from app.schemas import (
+    Notification,
     NotificationType,
-    TransferInfo,
     TransferDirectoryConf,
+    TransferInfo,
+    RefreshMediaItem,
     ServiceInfo,
 )
 
@@ -49,7 +51,7 @@ class autoTransfer(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/BrettDean/MoviePilot-Plugins/main/icons/autotransfer.png"
     # 插件版本
-    plugin_version = "1.0.43"
+    plugin_version = "1.0.45"
     # 插件作者
     plugin_author = "Dean"
     # 作者主页
@@ -77,6 +79,10 @@ class autoTransfer(_PluginBase):
     _scrape = False
     _category = False
     _refresh = False
+    _refresh_modified = False
+    _mediaservers = None
+    _delay = 10
+    mediaserver_helper = None
     _reset_plunin_data = False
     _softlink = False
     _strm = False
@@ -113,6 +119,7 @@ class autoTransfer(_PluginBase):
         self.chainbase = ChainBase()
         self.filetransfer = FileManagerModule()
         self.downloader_helper = DownloaderHelper()
+        self.mediaserver_helper = MediaServerHelper()
         # 清空配置
         self._dirconf = {}
         self._transferconf = {}
@@ -127,6 +134,9 @@ class autoTransfer(_PluginBase):
             self._scrape = config.get("scrape")
             self._category = config.get("category")
             self._refresh = config.get("refresh")
+            self._refresh_modified = config.get("refresh_modified")
+            self._mediaservers = config.get("mediaservers") or []
+            self._delay = config.get("delay") or 10
             self._reset_plunin_data = config.get("reset_plunin_data")
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
@@ -148,6 +158,13 @@ class autoTransfer(_PluginBase):
 
         # 停止现有任务
         self.stop_service()
+
+        # 重置插件运行数据
+        if bool(self._reset_plunin_data):
+            self.__runResetPlunindata()
+            self._reset_plunin_data = False
+            self.__update_config()
+            logger.info("重置插件运行数据成功")
 
         if self._enabled or self._onlyonce:
             # 定时服务管理器
@@ -216,13 +233,6 @@ class autoTransfer(_PluginBase):
                     except Exception as e:
                         logger.debug(str(e))
 
-            # 重置插件运行数据
-            if bool(self._reset_plunin_data):
-                self.__runResetPlunindata()
-                self._reset_plunin_data = False
-                self.__update_config()
-                logger.info("重置插件运行数据成功")
-
             # 运行一次定时服务
             if self._onlyonce:
                 logger.info("立即运行一次")
@@ -252,19 +262,22 @@ class autoTransfer(_PluginBase):
                 "enabled": self._enabled,
                 "notify": self._notify,
                 "onlyonce": self._onlyonce,
+                "history": self._history,
+                "scrape": self._scrape,
+                "category": self._category,
+                "refresh": self._refresh,
+                "refresh_modified": self._refresh_modified,
+                "mediaservers": self._mediaservers,
+                "delay": self._delay,
+                "reset_plunin_data": self._reset_plunin_data,
                 "transfer_type": self._transfer_type,
                 "monitor_dirs": self._monitor_dirs,
                 "exclude_keywords": self._exclude_keywords,
                 "interval": self._interval,
-                "history": self._history,
+                "cron": self._cron,
+                "size": self._size,
                 "softlink": self._softlink,
                 "strm": self._strm,
-                "scrape": self._scrape,
-                "category": self._category,
-                "size": self._size,
-                "refresh": self._refresh,
-                "reset_plunin_data": self._reset_plunin_data,
-                "cron": self._cron,
                 "del_empty_dir": self._del_empty_dir,
                 "pathAfterMoveFailure": self._pathAfterMoveFailure,
                 "downloaderSpeedLimit": self._downloaderSpeedLimit,
@@ -482,6 +495,33 @@ class autoTransfer(_PluginBase):
         self.del_data(key="download_limit_current_val")
         self.del_data(key="is_download_speed_limited")
 
+    @property
+    def service_infos(self) -> Optional[Dict[str, ServiceInfo]]:
+        """
+        服务信息
+        """
+        if not self._mediaservers:
+            logger.warning("尚未配置媒体服务器，请检查配置")
+            return None
+
+        services = self.mediaserver_helper.get_services(name_filters=self._mediaservers)
+        if not services:
+            logger.warning("获取媒体服务器实例失败，请检查配置")
+            return None
+
+        active_services = {}
+        for service_name, service_info in services.items():
+            if service_info.instance.is_inactive():
+                logger.warning(f"媒体服务器 {service_name} 未连接，请检查配置")
+            else:
+                active_services[service_name] = service_info
+
+        if not active_services:
+            logger.warning("没有已连接的媒体服务器，请检查配置")
+            return None
+
+        return active_services
+
     def main(self):
         """
         立即运行一次
@@ -573,7 +613,7 @@ class autoTransfer(_PluginBase):
                                 retry_count += 1
                                 continue  # 重试
 
-                # 广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新
+                # 广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新或使用修改版刷新plex媒体库
                 if self._refresh:
                     for transferinfo, mediainfo, file_meta in unique_items.values():
                         try:
@@ -592,6 +632,17 @@ class autoTransfer(_PluginBase):
                             logger.error(
                                 f"通知媒体库刷新失败: {transferinfo.target_diritem.path} ,错误信息: {e}"
                             )
+                elif self._refresh_modified:
+                    for transferinfo, mediainfo, file_meta in unique_items.values():
+                        try:
+                            self._refresh_lib_modified(transferinfo, mediainfo)
+                            logger.info(
+                                f"成功通知媒体库刷新: {transferinfo.target_diritem.path}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"通知媒体库刷新失败: {transferinfo.target_diritem.path} ,错误信息: {e}"
+                            )
 
             logger.info("目录内所有文件整理完成！")
             self.__update_plugin_state("finished")
@@ -601,6 +652,118 @@ class autoTransfer(_PluginBase):
                 f"插件{self.plugin_name} V{self.plugin_version} 运行失败，错误信息:{e}，traceback={traceback.format_exc()}"
             )
             self.__update_plugin_state("failed")
+
+    def _refresh_lib_modified(self, transferinfo, mediainfo):
+        """
+        发送通知消息
+        """
+        # if not self._enabled:
+        #     return
+
+        # event_info: dict = event.event_data
+        # if not event_info:
+        #     return
+
+        # 刷新媒体库
+        if not self.service_infos:
+            return
+
+        if self._delay:
+            logger.info(f"延迟 {self._delay} 秒后刷新媒体库... ")
+            time.sleep(float(self._delay))
+
+        # 入库数据
+        # transferinfo: TransferInfo = event_info.get("transferinfo")
+        if (
+            not transferinfo
+            or not transferinfo.target_diritem
+            or not transferinfo.target_diritem.path
+        ):
+            return
+
+        # mediainfo: MediaInfo = event_info.get("mediainfo")
+        items = [
+            RefreshMediaItem(
+                title=mediainfo.title,
+                year=mediainfo.year,
+                type=mediainfo.type,
+                category=mediainfo.category,
+                target_path=Path(transferinfo.target_diritem.path),
+            )
+        ]
+
+        for name, service in self.service_infos.items():
+            if service.type == "plex":
+                from app.db import ScopedSession
+                from sqlalchemy import Column, Integer, String, Text
+                from sqlalchemy.ext.declarative import declarative_base
+                import json
+
+                Base = declarative_base()
+
+                class SystemConfig(Base):
+                    __tablename__ = "systemconfig"
+
+                    id = Column(Integer, primary_key=True, autoincrement=True)
+                    key = Column(String(255), nullable=False)
+                    value = Column(Text, nullable=True)
+
+                try:
+                    db = ScopedSession()
+                    # 查询 key = "MediaServers" 的记录
+                    record = (
+                        db.query(SystemConfig)
+                        .filter(SystemConfig.key == "MediaServers")
+                        .first()
+                    )
+                finally:
+                    db.close()
+
+                media_conf = None
+                if record:
+                    try:
+                        media_servers = json.loads(record.value)
+                        for item in media_servers:
+                            if (
+                                item["name"] == service.name
+                                and item["type"] == service.type
+                            ):
+                                media_conf = item
+                                if not media_conf:
+                                    logger.error(
+                                        f"请检查媒体服务器 {service.name} 的配置！"
+                                    )
+                                    return
+                                break
+                    except Exception as e:
+                        logger.error("JSON 解析失败:", e)
+
+                from .plex.plex import Plex as class_plex
+
+                if hasattr(class_plex, "refresh_library_by_items_modified"):
+
+                    plex_instance = class_plex(
+                        host=media_conf["config"]["host"],
+                        token=media_conf["config"]["token"],
+                        play_host=media_conf["config"]["play_host"],
+                        sync_libraries=media_conf["sync_libraries"],
+                    )
+
+                    plex_instance.refresh_library_by_items_modified(items)
+                    # service.instance.refresh_library_by_items(items)
+                elif hasattr(service.instance, "refresh_root_library"):
+                    # FIXME Jellyfin未找到刷新单个项目的API
+                    service.instance.refresh_root_library()
+                else:
+                    logger.warning(f"{name} 不支持刷新")
+            else:  # 如果不是plex就按照原来的的刷新流程
+                if hasattr(service.instance, "refresh_library_by_items"):
+                    service.instance.refresh_library_by_items(items)
+                elif hasattr(service.instance, "refresh_root_library"):
+                    # FIXME Jellyfin未找到刷新单个项目的API
+                    service.instance.refresh_root_library()
+                else:
+                    logger.warning(f"{name} 不支持刷新")
 
     def __update_file_meta(
         self, file_path: str, file_meta: Dict, get_by_path_result
@@ -1150,6 +1313,7 @@ class autoTransfer(_PluginBase):
             mediainfo.original_language
         ):
             from .res import language_mapping
+
             msg_str = f"{msg_str}\n🗣 原始语言: {language_mapping.get(mediainfo.original_language, mediainfo.original_language)}"
         # 电影才有mediainfo.release_date?
         if (
@@ -1193,16 +1357,19 @@ class autoTransfer(_PluginBase):
         if bool(transferinfo.message):
             msg_str = f"{msg_str}\n以下文件处理失败: \n{transferinfo.message}"
         # 发送
-        self.chainbase.post_message(
-            Notification(
-                mtype=NotificationType.Organize,
-                title=msg_title,
-                text=msg_str,
-                image=mediainfo.get_message_image(),
-                username=username,
-                link=mediainfo.detail_link,
+        try:
+            self.chainbase.post_message(
+                Notification(
+                    mtype=NotificationType.Organize,
+                    title=msg_title,
+                    text=msg_str,
+                    image=mediainfo.get_message_image(),
+                    username=username,
+                    link=mediainfo.detail_link,
+                )
             )
-        )
+        except Exception as e:
+            logger.error(f"发送消息失败: {str(e)}, traceback={traceback.format_exc()}")
 
     def send_msg(self):
         """
@@ -1274,9 +1441,10 @@ class autoTransfer(_PluginBase):
                         logger.error(
                             f"发送消息失败: {str(e)}, traceback={traceback.format_exc()}"
                         )
-                        del self._medias[medis_title_year_season]
-                # 发送完消息，移出key
-                del self._medias[medis_title_year_season]
+                    finally:
+                        # 无论发送成功与否，都移出已处理的媒体项
+                        if medis_title_year_season in self._medias:
+                            del self._medias[medis_title_year_season]
                 continue
 
     def get_state(self) -> bool:
@@ -1304,7 +1472,7 @@ class autoTransfer(_PluginBase):
             return [
                 {
                     "id": "autoTransfer",
-                    "name": "类似v1的目录监控，可定期整理文件",
+                    "name": "autoTransfer定期整理文件",
                     "trigger": CronTrigger.from_crontab(self._cron),
                     "func": self.main,
                     "kwargs": {},
@@ -1427,10 +1595,11 @@ class autoTransfer(_PluginBase):
                                             {
                                                 "component": "VSwitch",
                                                 "props": {
-                                                    "model": "refresh",
-                                                    "label": "刷新媒体库",
-                                                    "hint": "广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新，推荐开",
+                                                    "model": "EmptyPlaceholder",
+                                                    "label": "EmptyPlaceholder",
+                                                    "hint": "EmptyPlaceholder",
                                                     "persistent-hint": True,
+                                                    "style": "visibility: hidden",
                                                 },
                                             }
                                         ],
@@ -1595,6 +1764,113 @@ class autoTransfer(_PluginBase):
                             },
                             {
                                 "component": "VCol",
+                                "props": {"cols": 12, "md": 3},
+                                "content": [
+                                    {
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "refresh",
+                                            "label": "刷新媒体库",
+                                            "hint": "广播整理完成事件，让插件'媒体库服务器刷新'通知媒体库刷新，推荐开",
+                                            "persistent-hint": True,
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 3},
+                                "content": [
+                                    {
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "refresh_modified",
+                                            "label": "刷新媒体库修改版",
+                                            "hint": "修改plex刷新的路径，不广播完成事件了，直接把广播后的代码搬过来微调了一下",
+                                            "persistent-hint": True,
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 3},
+                                "content": [
+                                    {
+                                        "component": "VSelect",
+                                        "props": {
+                                            "multiple": True,
+                                            "chips": True,
+                                            "clearable": True,
+                                            "model": "mediaservers",
+                                            "label": "媒体服务器",
+                                            "hint": "刷新媒体库修改版使用的媒体服务器",
+                                            "persistent-hint": True,
+                                            "items": [
+                                                {
+                                                    "title": config.name,
+                                                    "value": config.name,
+                                                }
+                                                for config in self.mediaserver_helper.get_configs().values()
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 3},
+                                "content": [
+                                    {
+                                        "component": "VTextField",
+                                        "props": {
+                                            "model": "delay",
+                                            "label": "延迟时间（秒）",
+                                            "placeholder": "10",
+                                            "hint": "延迟特定秒后刷新媒体库，默认10",
+                                            "persistent-hint": True,
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12},
+                                "content": [
+                                    {
+                                        "component": "VAlert",
+                                        "props": {
+                                            "type": "info",
+                                            "variant": "text",
+                                            "text": "两个开关二选一即可。'媒体服务器'和'延迟时间'的设置只和'刷新媒体库修改版'有关。两个开关区别：比如原版刷新媒体库的逻辑是入库了 '/Library/电视剧/欧美剧/黑镜 (2011)' 以后就让 plex 扫描 '/Library/电视剧/欧美剧/'，而修改版则是让 plex 扫描 '/Library/电视剧/欧美剧/黑镜 (2011)/'，从扫描欧美剧下的所有文件夹变为只扫描黑镜，大幅减少工作量。如果媒体服务器不是plex，不管选哪个都是走原来的逻辑",
+                                            "density": "compact",
+                                            "style": "font-size: 13px; color: #666;",
+                                        },
+                                    }
+                                ],
+                            },
+                        ],
+                    },
+                    {
+                        "component": "VRow",
+                        "content": [
+                            {
+                                "component": "VCol",
+                                "props": {"cols": 12},
+                                "content": [
+                                    {
+                                        "component": "VCol",
+                                        "props": {"cols": 12},
+                                        "content": [
+                                            {
+                                                "component": "VProgressLinear",
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "component": "VCol",
                                 "props": {"cols": 3, "md": 3},
                                 "content": [
                                     {
@@ -1700,7 +1976,7 @@ class autoTransfer(_PluginBase):
                                         "props": {
                                             "model": "downloaders_limit_enabled",
                                             "label": "开启下载器限速",
-                                            "hint": "开启后，在移动或复制文件时会限制qb下载速度，默认关闭",
+                                            "hint": "开启后，在移动或复制文件时会限制qb下载速度，完成后恢复原(限)速，默认关闭",
                                             "persistent-hint": True,
                                         },
                                     }
@@ -1980,7 +2256,8 @@ class autoTransfer(_PluginBase):
             "history": False,
             "scrape": False,
             "category": False,
-            "refresh": True,
+            "refresh": False,
+            "refresh_modified": False,
             "reset_plunin_data": False,
             "softlink": False,
             "strm": False,
@@ -1992,7 +2269,7 @@ class autoTransfer(_PluginBase):
             "size": 0,
             "del_empty_dir": False,
             "downloaderSpeedLimit": 0,
-            "downloaders": "不限速",
+            "downloaders": "",
             "pathAfterMoveFailure": None,
             "move_failed_files": True,
             "move_excluded_files": True,
